@@ -2,9 +2,12 @@ from scipy.optimize import linprog
 import numpy as np
 from numpy import random
 
-#objective function
-c = [2000] * 12 + [320] * 12 + [400] * 12 + [8] * 12 + [180] * 12 +[0] * 12
 
+
+
+#objective function
+c = np.array([2000] * 12 + [320] * 12 + [400] * 12 + [8] * 12 + [180] * 12 +[0] * 12)
+c=c.transpose()
 """
 x_i - 20w_i - o_i = 0
 
@@ -20,7 +23,7 @@ w_i, x_i, o_i, h_i, f_i, s_i >= 0   bnd
 Helper function for filling subdiagonals.
 
 Inputs:
-- matrix: 36x72 matrix containing entries for lhs_eq
+- matrix: A matrix with rows and columns both in multiples of 12
 - index: Index of first entry of sub-matrix to start at
 - val: Value to change sub-diagonal entries to
 
@@ -39,8 +42,9 @@ def fillSubDiag(matrix, r, c, val):
 matrix_eq = np.zeros((36, 72))
 
 #first equality
-np.fill_diagonal(matrix_eq[0:12, 0:12], -20) #1st row 1st col
-np.fill_diagonal(matrix_eq[0:12, 48:60], -1) #1st row 2nd col
+np.fill_diagonal(matrix_eq[0:12, 0:12], -20) #w
+np.fill_diagonal(matrix_eq[0:12, 48:60], -1) #o
+np.fill_diagonal(matrix_eq[0:12, 60:72], 1) #x
 
 #2nd equality
 np.fill_diagonal(matrix_eq[12:24, 0:12], 1) #w
@@ -58,12 +62,14 @@ np.fill_diagonal(matrix_eq[24:36, 60:72], -1) #x
 
 v1 = np.array([0]*12)
 v2 = np.array([30] + [0]*11)
-v3 = random.randint(low=-920, high=-440, size=12)
+v3 = random.randint(low=-920, high=-440, size=12) #d
 
 # Transpose each array
 v1_transposed = v1.transpose()
 v2_transposed = v2.transpose()
 v3_transposed = v3.transpose()
+
+print("\nValues of d:\n", v3_transposed)
 
 # Stack the transposed arrays
 final_eq_vector = np.hstack((v1_transposed, v2_transposed, v3_transposed))
@@ -72,26 +78,34 @@ final_eq_vector = np.hstack((v1_transposed, v2_transposed, v3_transposed))
 #LHS INEQUALITIES
 
 #initialize matrix w/ 12 rows, 72 columns
-matrix_ineq = np.zeros((84, 72))
+matrix_ineq = np.zeros((12, 72))
 
 #first and only inequality
 np.fill_diagonal(matrix_ineq[0:12, 0:12], 6) #w
 np.fill_diagonal(matrix_ineq[0:12, 48:60], -1) #o
 
-#all the other inequalities
-np.fill_diagonal(matrix_ineq[12:24, 0:12], 1) #w
-np.fill_diagonal(matrix_ineq[24:36, 12:24], 1) #h
-np.fill_diagonal(matrix_ineq[36:48, 24:36], 1) #f
-np.fill_diagonal(matrix_ineq[48:60, 36:48], 1) #s
-np.fill_diagonal(matrix_ineq[60:72, 48:60], 1) #o
-np.fill_diagonal(matrix_ineq[72:84, 60:72], 1) #x
-
 
 #RHS INEQUALITIES
 
-v_ineq = np.array([0]*84)
-final_ineq_vector = v_ineq.transpose()
+v_ineq = np.array([0]*12).transpose()
 
-opt = linprog(c=c, A_ub=matrix_ineq, b_ub=final_ineq_vector, A_eq=matrix_eq, b_eq=final_eq_vector)
+# Define the bounds for each variable for each month
+bounds_w = [(0, float("inf"))] * 12
+bounds_h = [(0, float("inf"))] * 12
+# bounds_f = [(0, 30)] + [(0, float("inf"))] * 11  # Limit f_1 to (0, 30)
+bounds_f = [(0, float("inf"))] *12
+bounds_s = [(0, float("inf"))] * 12
+bounds_o = [(0, float("inf"))] * 12
+bounds_x = [(0, float("inf"))] * 12
+
+# Concatenate the bounds for all variables
+bounds = np.array(bounds_w + bounds_h + bounds_f + bounds_s + bounds_o + bounds_x)
+
+
+opt = linprog(c=c, A_ub=matrix_ineq, b_ub=v_ineq, A_eq=matrix_eq, b_eq=final_eq_vector, bounds=bounds, method='simplex')
 
 print(opt)
+
+print(opt.success)
+
+print(opt.x)
